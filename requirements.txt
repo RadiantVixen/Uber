@@ -1,2 +1,5 @@
 statsmodels
-sklearn
+scikit-learn
+pandas
+numpy
+statsmodels
