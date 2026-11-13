@@ -338,7 +338,7 @@ $$
 **MLE optimisation for both parameters:**
 
 $$
-(\hat{\alpha}, \hat{\beta}^{*}) = \arg\min_{\alpha,\, \beta^{*} \in [0,1]} \sum_{t=1}^{n} \bigl(y_t - (\ell_{t-1} + b_{t-1})\bigr)^{2}
+(\hat{\alpha}, \hat{\beta}^{*}) = \operatorname*{arg\,min}_{\alpha,\, \beta^{*} \in [0,1]} \sum_{t=1}^{n} \bigl(y_t - (\ell_{t-1} + b_{t-1})\bigr)^{2}
 $$
 
 **Notation:**
