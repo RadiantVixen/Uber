@@ -319,8 +319,9 @@ $$
 $$
 
 $$
-b_{t} = \beta^{*}(\ell_{t} - \ell_{t-1}) + (1 - \beta^{*}) \, b_{t-1}
+b_{t} = \beta^{\ast}(\ell_{t} - \ell_{t-1}) + (1 - \beta^{\ast}) \, b_{t-1}
 $$
+
 
 #### Multi-Step Forecast (linear slope)
 
