@@ -155,6 +155,13 @@ Historical mean: (100 + 120 + 140 + 80 + 160) / 5 = **120**
 
 > **Key Takeaway:** The naive model produces a completely flat, constant projection across the entire forecasting window.
 
+### Forecast Visualization
+
+<div align="center">
+  <img src="images/naive_average_forecast.png" alt="Naive Average Forecast" width="800"/>
+  <p><em>Figure 1: Naive average forecast, a flat line at the historical mean.</em></p>
+</div>
+
 ### Results
 
 | Metric | Value |
@@ -201,6 +208,13 @@ $$
 | 672 | 7 days | *(fill after running)* |
 
 **Best window:** *(fill after running)*
+
+### Forecast Visualization
+
+<div align="center">
+  <img src="images/moving_average.jpeg" alt="Moving Average Forecast" width="800"/>
+  <p><em>Figure 2: Moving average forecast for the tested window sizes.</em></p>
+</div>
 
 ### Results
 
@@ -304,6 +318,11 @@ $$
 
 Forecast for all future steps: **126.7**
 
+<div align="center">
+  <img src="images/simple_exponential_smoothing.png" alt="Simple Exponential Smoothing Forecast" width="800"/>
+  <p><em>Figure 3: Simple Exponential Smoothing (SES), a flat forecast at the last smoothed level.</em></p>
+</div>
+
 ---
 
 ### Algorithm 2: Holt's Linear Trend Model (Double ES)
@@ -321,7 +340,6 @@ $$
 $$
 b_{t} = \beta^{\ast}(\ell_{t} - \ell_{t-1}) + (1 - \beta^{\ast}) \, b_{t-1}
 $$
-
 
 #### Multi-Step Forecast (linear slope)
 
@@ -363,6 +381,11 @@ $$
 | 09:15 (h=1) | 104.9 + 1(−1.1) | 103.8 |
 | 09:30 (h=2) | 104.9 + 2(−1.1) | 102.7 |
 | 09:45 (h=3) | 104.9 + 3(−1.1) | 101.6 |
+
+<div align="center">
+  <img src="images/holt_linear_trend_forecast.jpeg" alt="Holt Linear Trend Forecast" width="800"/>
+  <p><em>Figure 4: Holt's linear trend method, with level and slope extrapolated.</em></p>
+</div>
 
 ---
 
@@ -411,6 +434,11 @@ $$
 - `s_t` — seasonal component at time t
 - `γ ∈ [0, 1]` — seasonal smoothing parameter
 - `m = 96` — seasonal period (one day at 15-min granularity)
+
+<div align="center">
+  <img src="images/holt_winters_seasonal_forecast.jpeg" alt="Holt-Winters Seasonal Forecast" width="800"/>
+  <p><em>Figure 5: Holt-Winters seasonal forecast (m = 96), capturing daily cycles.</em></p>
+</div>
 
 ---
 
@@ -490,6 +518,16 @@ $$
 
 The model with the lowest AIC is selected **per area independently**.
 
+### Forecast Visualizations
+
+<div align="center">
+  <img src="images/arima_forecast.jpeg" alt="ARIMA Forecast" width="800"/>
+  <p><em>Figure 6: Plain ARIMA forecast (no seasonal component).</em></p>
+
+  <img src="images/sarima_forecast.jpeg" alt="SARIMA Forecast" width="800"/>
+  <p><em>Figure 7: SARIMA forecast with daily seasonality (m = 96).</em></p>
+</div>
+
 ### Results
 
 | Metric | Value |
@@ -521,16 +559,18 @@ The model with the lowest AIC is selected **per area independently**.
 **Best approach:** *(fill after running)*  
 **Submission saved with:** *(fill after running)*
 
+### Visual Comparison
+
+| Naive | Moving Average | SES |
+|:---:|:---:|:---:|
+| <img src="images/naive_average_forecast.png" width="260"/> | <img src="images/moving_average.jpeg" width="260"/> | <img src="images/simple_exponential_smoothing.png" width="260"/> |
+
+| Holt | Holt-Winters | ARIMA | SARIMA |
+|:---:|:---:|:---:|:---:|
+| <img src="images/holt_linear_trend_forecast.jpeg" width="200"/> | <img src="images/holt_winters_seasonal_forecast.jpeg" width="200"/> | <img src="images/arima_forecast.jpeg" width="200"/> | <img src="images/sarima_forecast.jpeg" width="200"/> |
+
 ---
 
-## Conclusion
-
-*(Fill after running all experiments)*
-
-**Key takeaways:**
--
--
--
 
 **Potential improvements (bonus):**
 - **Classical ML:** Gradient-boosted trees with calendar features (hour, weekday, is_weekend, etc.)
