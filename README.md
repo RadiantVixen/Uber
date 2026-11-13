@@ -38,30 +38,30 @@ The Naive Average method assumes that future values will be approximately equal 
 
 ### **Mathematical formulation**
 
-Suppose we have a time series containing \(n\) historical observations:
+Suppose we have a time series containing $n$ historical observations:
 
-\[
+$$
 Y = [y_1, y_2, y_3, \ldots, y_n]
-\]
+$$
 
 We calculate the average:
 
-\[
+$$
 \bar{Y} = \frac{1}{n}\sum_{t=1}^{n}y_t
-\]
+$$
 
-Then, for every future time step \(h\):
+Then, for every future time step $h$:
 
-\[
+$$
 \boxed{\hat{y}_{n+h} = \bar{Y}}
-\]
+$$
 
 Where:
 
-- \(y_t\): Actual observation at time \(t\).
-- \(n\): Number of historical observations.
-- \(\bar{Y}\): Historical average.
-- \(\hat{y}_{n+h}\): Predicted value for a future time step.
+- $y_t$: Actual observation at time $t$.
+- $n$: Number of historical observations.
+- $\bar{Y}$: Historical average.
+- $\hat{y}_{n+h}$: Predicted value for a future time step.
 
 ## **3. Practical example**
 
@@ -77,13 +77,13 @@ Imagine that we have the following Uber demand observations for a particular are
 
 First, calculate the average:
 
-\[
+$$
 \bar{Y} = \frac{100+120+140+80+160}{5}
-\]
+$$
 
-\[
+$$
 \bar{Y} = 120
-\]
+$$
 
 Our forecast will therefore be:
 
