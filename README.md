@@ -1,133 +1,134 @@
-# Research Diary — Uber Taxi Demand Forecasting
+<div align="center">
 
-**Author:** Aicha Atki *aatki*
-**Dataset:** Chicago taxi pickups — 2019-04-01 → 2019-06-23
-**Granularity:** 15-minute intervals | **Areas:** 77
-**Task:** Forecast the next 7 days (672 intervals) of taxi demand per area  
-**Target metric:** Average MAE ≤ 10.0 on the test set
+# 📊 Research Diary: Multi-Area Time-Series Forecasting
+### Chicago Taxi & Ride-Hailing Demand Prediction Pipeline
+
+</div>
+
+---
+
+### **Metadata & Project Scope**
+| Attribute | Specification |
+| :--- | :--- |
+| **Author** | Aicha Atki (`aatki`) |
+| **Domain** | Spatial-Temporal Machine Learning & Predictive Modeling |
+| **Dataset** | Chicago Taxi Pickups (`2019-04-01` to `2019-06-23`) |
+| **Granularity** | 15-Minute Intervals across 77 Spatial Community Areas |
+| **Forecasting Horizon** | 7 Days Ahead (672 consecutive steps) |
+| **Target Metric** | Mean Absolute Error ($\text{MAE} \le 10.0$ on the test split) |
 
 ---
 
-## Dataset Overview
+## **1. Dataset Architecture & Exploratory Data Analysis**
 
-| Property | Value |
-|----------|-------|
-| File | `taxi_pickups_area.csv` |
-| Date range | 2019-04-01 → 2019-06-23 |
-| Total rows | ~8 064 |
-| Areas (columns) | 77 (`Pickup Community Area_0` … `_77`) |
-| Interval | 15 minutes |
-| Submission file | `taxi_submission_file.csv` (672 rows, starts 2019-06-24) |
+### **Overview**
+* **Source File:** `taxi_pickups_area.csv`
+* **Temporal Span:** April 1, 2019 – June 23, 2019 (~8,064 rows per area time series)
+* **Spatial Dimensions:** 77 distinct regional columns (`Pickup Community Area_0` through `_77`)
+* **Submission Deliverable:** `taxi_submission_file.csv` (672 target rows, initiating from `2019-06-24`)
 
-**Train / Validation split:**
-- Train : first N − 672 rows
-- Validation : last 672 rows (7 days)
-- Test : 672 rows from the submission template
+### **Data Split Strategy**
+* **Training Set:** Historical observations from index $0$ up to $N - 672$
+* **Validation Set:** The final 7 days ($672$ rows) of the observed timeline
+* **Test Set:** The blind 672-row forecasting submission template
 
-**Key observations from EDA:**
-- Most areas have sparse demand (mean close to 0); a few downtown areas dominate
-- Clear daily seasonality (peaks during morning/evening rush hours)
-- Weekly seasonality visible (weekends differ from weekdays)
-- Some areas have near-zero variance across the entire dataset
+### **Key Exploratory Insights**
+* **Spatial Sparsity:** The majority of community zones exhibit low overall volume with means close to zero, while a select few high-density downtown hubs dominate aggregate demand.
+* **Intra-Day Seasonality:** Pronounced daily cycles reflecting peak commuter travel windows (morning and evening rush hours).
+* **Inter-Day Seasonality:** Distinct structural shifts between weekday traffic profiles and weekend patterns.
+* **Zero-Variance Zones:** Isolated geographical sectors display near-zero variance across the entire timeline, presenting edge cases for predictive modeling.
 
 ---
-## Naive Averages
 
-**What is the Naive Average method?**
-The Naive Average method assumes that future values will be approximately equal to the average of all previously observed values.
+## **2. Baseline Model: Naive Averages**
 
-### **Mathematical formulation**
+### **2.1. Conceptual Definition**
+The Naive Average baseline acts as a foundational benchmark, assuming that future realizations will align with the historical mean of all previously recorded observations for a given series.
 
-Suppose we have a time series containing $n$ historical observations:
+### **2.2. Mathematical Formulation**
+
+Given a univariate time series comprising $n$ historical observations:
 
 $$
 Y = [y_1, y_2, y_3, \ldots, y_n]
 $$
 
-We calculate the average:
+The historical average is computed as:
 
 $$
 \bar{Y} = \frac{1}{n}\sum_{t=1}^{n}y_t
 $$
 
-Then, for every future time step $h$:
+Consequently, the multi-step ahead forecast for any future time step $h$ evaluates to:
 
 $$
 \boxed{\hat{y}_{n+h} = \bar{Y}}
 $$
 
-Where:
+**Notation Reference:**
+- $y_t$: Observed demand value at time step $t$.
+- $n$: Total cardinality of historical observations.
+- $\bar{Y}$: Computed historical mean.
+- $\hat{y}_{n+h}$: Point prediction for future step $n+h$.
 
-- $y_t$: Actual observation at time $t$.
-- $n$: Number of historical observations.
-- $\bar{Y}$: Historical average.
-- $\hat{y}_{n+h}$: Predicted value for a future time step.
+---
 
-## **3. Practical example**
+### **2.3. Practical Demonstration**
 
-Imagine that we have the following Uber demand observations for a particular area:
+Consider a localized sample of Uber demand observations for an individual sector:
 
-| Time interval | Number of trips |
-|:---|---:|
-| 08:00 | 100 |
-| 08:15 | 120 |
-| 08:30 | 140 |
-| 08:45 | 80 |
-| 09:00 | 160 |
+| Time Interval | Recorded Trips ($y_t$) |
+| :--- | :---: |
+| **08:00** | 100 |
+| **08:15** | 120 |
+| **08:30** | 140 |
+| **08:45** | 80 |
+| **09:00** | 160 |
 
-First, calculate the average:
-
-$$
-\bar{Y} = \frac{100+120+140+80+160}{5}
-$$
+**Step 1:** Calculate the historical arithmetic mean ($\bar{Y}$):
 
 $$
-\bar{Y} = 120
+\bar{Y} = \frac{100 + 120 + 140 + 80 + 160}{5} = 120
 $$
 
-Our forecast will therefore be:
+**Step 2:** Project the constant forecast across the horizon:
 
-| Future interval | Predicted demand |
-|:---|---:|
-| 09:15 | 120 |
-| 09:30 | 120 |
-| 09:45 | 120 |
-| 10:00 | 120 |
-| 10:15 | 120 |
+| Future Interval | Predicted Demand ($\hat{y}_{n+h}$) |
+| :--- | :---: |
+| **09:15** | 120 |
+| **09:30** | 120 |
+| **09:45** | 120 |
+| **10:00** | 120 |
+| **10:15** | 120 |
 
-Notice something important: **the model predicts exactly the same demand for every future interval.**
+> **Key Takeaway:** The naive model produces a completely static, flat-line projection across the entire forecasting window.
 
 ![Naive Average Forecast](images/naive_average_forecast.png)
 
+---
 
-## **4. How did we apply it to the Uber project?**
+## **3. Pipeline Implementation**
 
-Our dataset contains multiple geographical areas, with each area representing an independent time series.
+Because the dataset encompasses 77 independent spatial community areas, the forecasting pipeline instantiates localized time-series models per zone:
 
-Therefore, we calculate a separate historical average for every area.
+* **Area A:** $\bar{Y} = 120 \text{ trips}$
+* **Area B:** $\bar{Y} = 85 \text{ trips}$
+* **Area C:** $\bar{Y} = 210 \text{ trips}$
 
-For example:
+Each area's calculated average is independently broadcast across its respective 672-step forecast horizon.
 
-- Area A → average demand = 120 trips.
-- Area B → average demand = 85 trips.
-- Area C → average demand = 210 trips.
+---
 
-Each area's average is then repeated across the entire forecasting horizon.
+## **4. Advantages & Limitations**
 
-## **5. Advantages and limitations**
+### **Advantages**
+* **Minimal Complexity:** Trivial to implement and scale across high-dimensional spatial datasets.
+* **High Efficiency:** Computationally inexpensive with zero runtime training overhead.
+* **Rigorous Baseline:** Establishes a performance floor required to validate advanced architectures (e.g., SARIMAX, RNN, and boosting frameworks).
+* **Parameter-Free:** Requires no hyperparameter tuning or optimization routines.
 
-**Advantages**
-
-- Very simple to implement.
-- Computationally inexpensive.
-- Provides a baseline against which more advanced models can be evaluated.
-- Does not require parameter optimization.
-
-**Limitations**
-
-- Cannot detect trends.
-- Cannot capture daily or weekly seasonality.
-- Cannot react to changes in demand.
-- Produces a constant forecast regardless of the time of day.
-
-This is particularly problematic for Uber demand because demand changes significantly throughout the day. For example, morning and evening rush hours generally have different demand levels from early morning.
+### **Limitations**
+* **Trend Blindness:** Incapable of capturing upward or downward trajectories.
+* **Agnostic to Seasonality:** Completely misses recurring daily and weekly cycles.
+* **Static Response:** Fails to react dynamically to sudden market shifts or external stimuli.
+* **Intra-Day Flatness:** Generates identical outputs regardless of the time of day, limiting efficacy for urban transport networks where demand fluctuates heavily between early morning lows and rush hour peaks.
