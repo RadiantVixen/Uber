@@ -1,8 +1,8 @@
 # Research Diary — Uber Taxi Demand Forecasting
 
-**Author:** *(your name)*  
-**Dataset:** Chicago taxi pickups — 2019-04-01 → 2019-06-23  
-**Granularity:** 15-minute intervals | **Areas:** 77  
+**Author:** Aicha Atki *aatki*
+**Dataset:** Chicago taxi pickups — 2019-04-01 → 2019-06-23
+**Granularity:** 15-minute intervals | **Areas:** 77
 **Task:** Forecast the next 7 days (672 intervals) of taxi demand per area  
 **Target metric:** Average MAE ≤ 10.0 on the test set
 
@@ -19,9 +19,9 @@
 | Interval | 15 minutes |
 | Submission file | `taxi_submission_file.csv` (672 rows, starts 2019-06-24) |
 
-**Train / Validation split:**  
-- Train : first N − 672 rows  
-- Validation : last 672 rows (7 days)  
+**Train / Validation split:**
+- Train : first N − 672 rows
+- Validation : last 672 rows (7 days)
 - Test : 672 rows from the submission template
 
 **Key observations from EDA:**
@@ -31,177 +31,103 @@
 - Some areas have near-zero variance across the entire dataset
 
 ---
+## Naive Averages
 
-## Approach 1 — Naive Averages
+**What is the Naive Average method?**
+The Naive Average method assumes that future values will be approximately equal to the average of all previously observed values.
 
-### Description
-For each area, the global mean of the entire training series is used as the prediction for every future interval. No temporal structure is modelled at all.
+### **Mathematical formulation**
 
-### Formula
-$$\hat{y}_{t+h} = \bar{y} = \frac{1}{T}\sum_{t=1}^{T} y_t$$
+Suppose we have a time series containing \(n\) historical observations:
 
-### Implementation notes
-- Simple `train_data[area].mean()` per column
-- Negative predictions clipped to 0 (counts can't be negative)
+\[
+Y = [y_1, y_2, y_3, \ldots, y_n]
+\]
 
-### Results
+We calculate the average:
 
-| Metric | Value |
-|--------|-------|
-| Validation MAE | *(fill after running)* |
+\[
+\bar{Y} = \frac{1}{n}\sum_{t=1}^{n}y_t
+\]
 
-### Observations
-- Establishes a hard upper-bound baseline — any real model should beat this
-- Completely ignores trends and seasonality
-- Adequate for areas with near-constant low demand
+Then, for every future time step \(h\):
 
----
+\[
+\boxed{\hat{y}_{n+h} = \bar{Y}}
+\]
 
-## Approach 2 — Moving Averages
+Where:
 
-### Description
-For each area, the mean of the last `window` training intervals is used as a flat forecast. Several window sizes are tested to find the optimal one.
+- \(y_t\): Actual observation at time \(t\).
+- \(n\): Number of historical observations.
+- \(\bar{Y}\): Historical average.
+- \(\hat{y}_{n+h}\): Predicted value for a future time step.
 
-### Windows tested
+## **3. Practical example**
 
-| Window (intervals) | Duration | Validation MAE |
-|--------------------|----------|----------------|
-| 48 | 12 hours | *(fill after running)* |
-| 96 | 1 day | *(fill after running)* |
-| 192 | 2 days | *(fill after running)* |
-| 336 | 3.5 days | *(fill after running)* |
-| 672 | 7 days | *(fill after running)* |
+Imagine that we have the following Uber demand observations for a particular area:
 
-**Best window:** *(fill after running)*
+| Time interval | Number of trips |
+|:---|---:|
+| 08:00 | 100 |
+| 08:15 | 120 |
+| 08:30 | 140 |
+| 08:45 | 80 |
+| 09:00 | 160 |
 
-### Implementation notes
-- `train_data[area].rolling(window=w).mean().iloc[-1]`
-- Falls back to global mean if the rolling window contains NaNs
+First, calculate the average:
 
-### Results
+\[
+\bar{Y} = \frac{100+120+140+80+160}{5}
+\]
 
-| Metric | Value |
-|--------|-------|
-| Best window | *(fill after running)* |
-| Validation MAE | *(fill after running)* |
+\[
+\bar{Y} = 120
+\]
 
-### Observations
-- Shorter windows react faster to recent demand shifts
-- Longer windows are more stable but lag behind sudden changes
-- Outperforms naive averages when demand has drifted recently
+Our forecast will therefore be:
 
----
+| Future interval | Predicted demand |
+|:---|---:|
+| 09:15 | 120 |
+| 09:30 | 120 |
+| 09:45 | 120 |
+| 10:00 | 120 |
+| 10:15 | 120 |
 
-## Approach 3 — Exponential Smoothing
+Notice something important: **the model predicts exactly the same demand for every future interval.**
 
-### Description
-Three exponential-smoothing variants are fitted per area. The one with the lowest **AIC** (Akaike Information Criterion) is selected as the final model. All weights are optimised automatically.
+![Naive Average Forecast](images/naive_average_forecast.png)
 
-### The three algorithms
 
-| Algorithm | Trend | Seasonality | Seasonal period | Notes |
-|-----------|-------|-------------|-----------------|-------|
-| **SES** (Simple) | None | None | — | Single smoothing parameter α |
-| **Holt** (Double ES) | Additive | None | — | Adds level + trend (α, β) |
-| **Holt-Winters** (Triple ES) | Additive | Additive | 96 (= 1 day) | Adds seasonal component (α, β, γ) |
+## **4. How did we apply it to the Uber project?**
 
-### Model selection criterion
-AIC = −2 log(L) + 2k  
-*(lower is better; penalises complexity)*
+Our dataset contains multiple geographical areas, with each area representing an independent time series.
 
-### Implementation notes
-- `statsmodels.tsa.holtwinters.ExponentialSmoothing`
-- `initialization_method='estimated'` — initial values fitted from data
-- `optimized=True` — smoothing parameters found by numerical optimisation
-- Forecasts for test set are produced by re-fitting on train + validation data
+Therefore, we calculate a separate historical average for every area.
 
-### Results
+For example:
 
-| Metric | Value |
-|--------|-------|
-| Validation MAE | *(fill after running)* |
-| Most-selected algorithm | *(fill after running)* |
+- Area A → average demand = 120 trips.
+- Area B → average demand = 85 trips.
+- Area C → average demand = 210 trips.
 
-### Observations
-- Holt-Winters is expected to win for high-demand areas with clear daily cycles
-- SES tends to win for low-variance / near-zero areas
-- AIC selection avoids over-fitting on sparse series
+Each area's average is then repeated across the entire forecasting horizon.
 
----
+## **5. Advantages and limitations**
 
-## Approach 4 — SARIMA (AIC-based model selection)
+**Advantages**
 
-### Description
-SARIMA (Seasonal ARIMA) extends ARIMA with four additional seasonal parameters. For each area, a small candidate grid is searched and the model with the lowest **AIC** is selected.
+- Very simple to implement.
+- Computationally inexpensive.
+- Provides a baseline against which more advanced models can be evaluated.
+- Does not require parameter optimization.
 
-### SARIMA parameters
+**Limitations**
 
-| Parameter | Meaning |
-|-----------|---------|
-| p | Autoregressive order |
-| d | Differencing order (makes series stationary) |
-| q | Moving-average order |
-| P | Seasonal AR order |
-| D | Seasonal differencing order |
-| Q | Seasonal MA order |
-| m | Number of time steps per seasonal period |
+- Cannot detect trends.
+- Cannot capture daily or weekly seasonality.
+- Cannot react to changes in demand.
+- Produces a constant forecast regardless of the time of day.
 
-**Seasonal period chosen: m = 96** (96 × 15 min = 1 day)
-
-### Candidate grid searched
-
-| Order (p,d,q) | Seasonal (P,D,Q,m) | Description |
-|--------------|-------------------|-------------|
-| (1,1,1) | (0,0,0,0) | Plain ARIMA — good general baseline |
-| (1,1,1) | (1,0,1,96) | SARIMA — daily seasonality captured |
-| (2,1,2) | (0,0,0,0) | Higher-order ARIMA — more complex dynamics |
-| (1,0,1) | (0,0,0,0) | Stationary ARMA — no differencing |
-
-### Implementation notes
-- `statsmodels.tsa.statespace.sarimax.SARIMAX`
-- `enforce_stationarity=False`, `enforce_invertibility=False` — prevents fitting errors on flat series
-- Fallback to series mean if all candidates fail (e.g., constant or all-zero series)
-- Computation time: ~10–30 min on CPU (77 areas × 4 candidates × 2 fits)
-
-### Results
-
-| Metric | Value |
-|--------|-------|
-| Validation MAE | *(fill after running)* |
-| Most-selected order | *(fill after running)* |
-
-### Observations
-- Best suited for areas with complex autocorrelation structure
-- (1,1,1)(1,0,1,96) expected to perform best on high-traffic areas with strong daily patterns
-- Slower to train than exponential smoothing but can capture more dynamics
-
----
-
-## Final Comparison
-
-| # | Method | Validation MAE | Beats target (≤ 10.0) |
-|---|--------|---------------|----------------------|
-| 1 | Naive Averages | *(fill)* | *(fill)* |
-| 2 | Moving Averages | *(fill)* | *(fill)* |
-| 3 | Exponential Smoothing | *(fill)* | *(fill)* |
-| 4 | SARIMA | *(fill)* | *(fill)* |
-
-**Best approach:** *(fill after running)*  
-**Submission saved with:** *(fill after running)*
-
----
-
-## Conclusion
-
-*(Fill after running all experiments)*
-
-Key takeaways:
-- 
-- 
-- 
-
-Possible improvements (bonus):
-- **Classical ML:** gradient-boosted trees with calendar features (hour, weekday, etc.)
-- **Deep Learning:** LSTM / GRU encoder on the raw time series
-- **Ensemble:** average predictions from the best 2–3 models above
-
+This is particularly problematic for Uber demand because demand changes significantly throughout the day. For example, morning and evening rush hours generally have different demand levels from early morning.
