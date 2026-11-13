@@ -41,25 +41,23 @@
 
 ---
 
----
-
 ## Background A — Evaluation Metric: Mean Absolute Error (MAE)
 
 ### What is MAE?
-The **Mean Absolute Error (MAE)** measures the average magnitude of prediction errors across the forecasting horizon, without considering their direction. It is the average absolute difference between actual observed demand and predicted demand.
+The **Mean Absolute Error (MAE)** measures the average magnitude of prediction errors across the forecasting horizon, without considering direction. It is the average absolute difference between actual observed demand and predicted demand.
 
 ### Mathematical Formulation
 
 For a sequence of n evaluation steps:
 
 $$
-\text{MAE} = \frac{1}{n} \sum_{t=1}^{n} |y_t - \hat{y}_t|
+\text{MAE} = \frac{1}{n} \sum_{t=1}^{n} \lvert y_t - \hat{y}_t \rvert
 $$
 
 **Notation:**
 - `y_t` — actual recorded trips at time step t
 - `ŷ_t` — predicted trips at time step t
-- `n` — total number of evaluation intervals (672 steps over the 7-day test horizon)
+- `n` — total evaluation intervals (672 steps over the 7-day test horizon)
 
 ### Why MAE for this project?
 - **Direct Interpretability:** MAE is in the same units as the target (number of trips). An MAE of 8.5 means predictions deviate by an average of 8.5 trips per 15-minute interval.
@@ -68,13 +66,11 @@ $$
 
 ---
 
----
-
 ## Background B — Model Selection: Akaike Information Criterion (AIC)
 
 ### What is AIC?
-When comparing models (e.g., choosing between ARIMA orders or between SES/Holt/Holt-Winters), looking only at training error is insufficient — more complex models always fit training data better but risk overfitting. The **Akaike Information Criterion (AIC)** establishes a trade-off between:
-1. **Goodness-of-Fit:** How well the model explains the training data (via likelihood).
+When comparing models, looking only at training error is insufficient — more complex models always fit training data better but risk overfitting. The **Akaike Information Criterion (AIC)** establishes a principled trade-off between:
+1. **Goodness-of-Fit:** How well the model explains the training data.
 2. **Parsimony:** A penalty for the number of estimated parameters.
 
 ### Mathematical Formulation
@@ -84,23 +80,45 @@ $$
 $$
 
 Where:
-- `k` — total number of estimated parameters
-- `L` — maximized value of the likelihood function
+- `k` — total number of estimated parameters in the model
+- `L` — the maximized likelihood value (how probable the data is given the fitted model)
 - `ln(L)` — maximized log-likelihood
 
-**Goal:** minimize AIC across all candidate models:
+**Goal:** minimize AIC across all candidates:
 
 $$
 \text{Best Model} = \arg\min_{\text{model}} \; \text{AIC}(\text{model})
 $$
 
-### How it was applied
-Across the 77 areas (which vary from near-zero sparse zones to busy downtown hubs), the pipeline:
-1. Iterates through candidate model configurations per area.
-2. Computes AIC for each fitted model.
-3. Automatically selects the optimal configuration — e.g., SES for sparse areas, SARIMA for high-volume seasonal corridors.
+### Understanding Likelihood (L)
 
----
+The **likelihood** L answers the question: *given the fitted model parameters, how probable is the observed training data?*
+
+For models with normally distributed errors (which all models here assume), the Gaussian log-likelihood over n training observations is:
+
+$$
+\ln(L) = -\frac{n}{2}\ln(2\pi) - \frac{n}{2}\ln(\sigma^{2}) - \frac{1}{2\sigma^{2}} \sum_{t=1}^{n} \varepsilon_{t}^{2}
+$$
+
+Where:
+- `σ²` — variance of the residual errors
+- `εt = yt − ŷt` — one-step-ahead prediction error (residual) at time t
+
+**Key intuition:**
+- A model that produces small residuals (εt ≈ 0) → high likelihood L → lower AIC → preferred.
+- A model with many parameters (high k) → higher AIC penalty → only wins if the fit improvement justifies the complexity.
+
+Maximising ln(L) is mathematically equivalent to **minimising the Sum of Squared Errors (SSE)**:
+
+$$
+\max \ln(L) \;\Longleftrightarrow\; \min \sum_{t=1}^{n} \varepsilon_{t}^{2}
+$$
+
+### How AIC was applied
+Across the 77 areas, the pipeline:
+1. Fits every candidate model configuration per area.
+2. Computes AIC for each fitted model.
+3. Automatically selects the configuration with the **lowest AIC** — e.g., SES for sparse areas, Holt-Winters for high-volume seasonal corridors.
 
 ---
 
@@ -110,8 +128,6 @@ Across the 77 areas (which vary from near-zero sparse zones to busy downtown hub
 The simplest possible baseline: future demand is predicted as the **global historical mean** of the series. No temporal structure is modelled.
 
 ### Mathematical Formulation
-
-Given a time series of n observations:
 
 $$
 \hat{y}_{n+h} = \bar{Y} = \frac{1}{n} \sum_{t=1}^{n} y_t
@@ -155,8 +171,6 @@ Historical mean: (100 + 120 + 140 + 80 + 160) / 5 = **120**
 
 ---
 
----
-
 ## Method 2 — Moving Averages
 
 ### What is the Moving Average method?
@@ -167,13 +181,13 @@ Instead of averaging all historical data, the Moving Average (MA) method compute
 Given a window size k, the Simple Moving Average at the final training step n is:
 
 $$
-\bar{y}_n = \frac{1}{k} \sum_{i=0}^{k-1} y_{n-i}
+\bar{y}_{n} = \frac{1}{k} \sum_{i=0}^{k-1} y_{n-i}
 $$
 
 The multi-step forecast broadcasts this recent mean flat:
 
 $$
-\hat{y}_{n+h} = \bar{y}_n
+\hat{y}_{n+h} = \bar{y}_{n}
 $$
 
 ### Window Sizes Tested
@@ -205,41 +219,82 @@ $$
 
 ---
 
----
-
 ## Method 3 — Exponential Smoothing (3 Algorithms)
 
 The subject requires testing **3 different exponential smoothing algorithms** per area, with the best selected by AIC.
 
 ---
 
-### 6.1 Algorithm 1: Simple Exponential Smoothing (SES)
+### How Weights Are Assigned in Exponential Smoothing
+
+Unlike moving averages which give equal weight to all observations inside the window (and zero weight outside it), exponential smoothing assigns **exponentially decreasing weights** to all past observations — the further back in time, the smaller the influence.
+
+For a smoothing parameter α, the weight given to an observation `t` periods in the past is:
+
+$$
+w_{t} = \alpha (1-\alpha)^{t}
+$$
+
+| Lag (periods ago) | Weight (α = 0.4) |
+|---|---|
+| 0 (most recent) | 0.400 |
+| 1 | 0.240 |
+| 2 | 0.144 |
+| 3 | 0.086 |
+| 4 | 0.052 |
+| 5 | 0.031 |
+
+**Key intuition:**
+- **α close to 1** → almost all weight on the most recent observation (reacts fast, noisy).
+- **α close to 0** → weight spread broadly over history (smooth, slow to adapt).
+- The optimal α is found automatically by **Maximum Likelihood Estimation (MLE)** — it is the value that minimises the sum of squared one-step-ahead errors across the training set.
+
+### How α is Estimated (MLE / SSE minimisation)
+
+The smoothing parameter α is chosen to maximise the Gaussian log-likelihood, which is equivalent to minimising the SSE of the one-step-ahead forecast errors:
+
+$$
+\hat{\alpha} = \arg\min_{\alpha \,\in\, [0,1]} \sum_{t=1}^{n} \bigl(y_t - \hat{y}_{t \mid t-1}\bigr)^{2}
+$$
+
+This optimisation is solved numerically (e.g., L-BFGS-B) by `statsmodels` automatically when `optimized=True`.
+
+---
+
+### Algorithm 1: Simple Exponential Smoothing (SES)
 
 **When to use:** Series with no trend and no seasonality.
 
-**Idea:** Assign exponentially decreasing weights to past observations — more recent data has more influence.
+**Idea:** The smoothed level ℓ_t is updated at every step as a weighted blend of the new observation and the previous level.
 
 #### Smoothing Equation
 
 $$
-\ell_t = \alpha \, y_t + (1 - \alpha) \, \ell_{t-1}
+\ell_{t} = \alpha \, y_{t} + (1 - \alpha) \, \ell_{t-1}
 $$
 
-#### Multi-Step Forecast (flat)
+#### Expanded form (shows exponential weights explicitly)
+
+Substituting repeatedly:
 
 $$
-\hat{y}_{n+h} = \ell_n
+\ell_{t} = \alpha \, y_{t} + \alpha(1-\alpha) y_{t-1} + \alpha(1-\alpha)^{2} y_{t-2} + \cdots
+$$
+
+#### Multi-Step Forecast (flat line)
+
+$$
+\hat{y}_{n+h} = \ell_{n}
 $$
 
 **Notation:**
-- `y_t` — actual observation at time t
 - `ℓ_t` — smoothed level at time t
-- `α ∈ [0, 1]` — smoothing parameter (optimised by MLE)
+- `α ∈ [0, 1]` — level smoothing parameter (MLE-optimised)
 - `h` — forecast horizon step
 
-#### Practical Example (alpha = 0.4)
+#### Practical Example (α = 0.4)
 
-| Time | Recorded Trips | Smoothed Level |
+| Time | Recorded | Smoothed Level |
 |:---|:---:|:---:|
 | 08:00 | 100 | 100.0 |
 | 08:15 | 120 | 0.4(120) + 0.6(100) = 108.0 |
@@ -251,36 +306,48 @@ Forecast for all future steps: **126.7**
 
 ---
 
-### 6.2 Algorithm 2: Holt's Linear Trend Model (Double ES)
+### Algorithm 2: Holt's Linear Trend Model (Double ES)
 
 **When to use:** Series with a clear upward or downward trend, but no seasonality.
 
-**Idea:** Adds a second smoothing equation for the **trend** component.
+**Idea:** Two parameters are optimised — α for the level and β* for the trend (slope). Both are found by MLE/SSE minimisation simultaneously.
 
 #### Level & Trend Equations
 
 $$
-\ell_t = \alpha \, y_t + (1 - \alpha)(\ell_{t-1} + b_{t-1})
+\ell_{t} = \alpha \, y_{t} + (1 - \alpha)(\ell_{t-1} + b_{t-1})
 $$
 
 $$
-b_t = \beta^{*}(\ell_t - \ell_{t-1}) + (1 - \beta^{*}) \, b_{t-1}
+b_{t} = \beta^{*}(\ell_{t} - \ell_{t-1}) + (1 - \beta^{*}) \, b_{t-1}
 $$
 
 #### Multi-Step Forecast (linear slope)
 
 $$
-\hat{y}_{n+h} = \ell_n + h \, b_n
+\hat{y}_{n+h} = \ell_{n} + h \, b_{n}
+$$
+
+#### How β* controls trend smoothing
+
+| β* value | Behaviour |
+|---|---|
+| Close to 1 | Trend reacts fast to recent slope changes |
+| Close to 0 | Trend changes slowly, more stable long-run slope |
+
+**MLE optimisation for both parameters:**
+
+$$
+(\hat{\alpha}, \hat{\beta}^{*}) = \arg\min_{\alpha,\, \beta^{*} \in [0,1]} \sum_{t=1}^{n} \bigl(y_t - (\ell_{t-1} + b_{t-1})\bigr)^{2}
 $$
 
 **Notation:**
 - `ℓ_t` — smoothed level at time t
 - `b_t` — smoothed trend (slope) at time t
-- `α ∈ [0, 1]` — level smoothing parameter
-- `β* ∈ [0, 1]` — trend smoothing parameter
-- `h` — forecast horizon step
+- `α` — level smoothing parameter
+- `β*` — trend smoothing parameter
 
-#### Practical Example (alpha = 0.4, beta = 0.2)
+#### Practical Example (α = 0.4, β* = 0.2)
 
 | Time | Recorded | Level | Trend |
 |:---|:---:|:---:|:---:|
@@ -298,33 +365,46 @@ $$
 
 ---
 
-### 6.3 Algorithm 3: Holt-Winters Seasonal Method (Triple ES)
+### Algorithm 3: Holt-Winters Seasonal Method (Triple ES)
 
 **When to use:** Series with both trend and recurring seasonal cycles.
 
-**Idea:** Adds a third smoothing equation for the **seasonal** component. We use the **additive** formulation (seasonal fluctuations remain roughly constant in magnitude). Seasonal period: `m = 96` (96 × 15 min = 1 day).
+**Idea:** Three smoothing equations, three MLE-optimised parameters (α, β*, γ). Seasonal period `m = 96` (96 × 15 min = 1 day).
 
 #### Level, Trend & Seasonal Equations
 
 $$
-\ell_t = \alpha (y_t - s_{t-m}) + (1 - \alpha)(\ell_{t-1} + b_{t-1})
+\ell_{t} = \alpha (y_{t} - s_{t-m}) + (1 - \alpha)(\ell_{t-1} + b_{t-1})
 $$
 
 $$
-b_t = \beta^{*}(\ell_t - \ell_{t-1}) + (1 - \beta^{*}) \, b_{t-1}
+b_{t} = \beta^{*}(\ell_{t} - \ell_{t-1}) + (1 - \beta^{*}) \, b_{t-1}
 $$
 
 $$
-s_t = \gamma (y_t - \ell_{t-1} - b_{t-1}) + (1 - \gamma) \, s_{t-m}
+s_{t} = \gamma (y_{t} - \ell_{t-1} - b_{t-1}) + (1 - \gamma) \, s_{t-m}
 $$
 
 #### Multi-Step Forecast
 
 $$
-\hat{y}_{n+h} = \ell_n + h \, b_n + s_{n+h-m(k+1)}
+\hat{y}_{n+h} = \ell_{n} + h \, b_{n} + s_{n+h-m \cdot (k+1)}
 $$
 
-*(where k is the integer part of (h−1)/m, ensuring the correct seasonal index is retrieved)*
+*(where k is the integer part of (h−1)/m, so the right seasonal index from the last observed cycle is retrieved)*
+
+#### How γ controls seasonal smoothing
+
+| γ value | Behaviour |
+|---|---|
+| Close to 1 | Seasonal pattern updates quickly (adapts to shifting peaks) |
+| Close to 0 | Seasonal pattern is very stable across all cycles |
+
+**MLE optimisation for all three parameters:**
+
+$$
+(\hat{\alpha}, \hat{\beta}^{*}, \hat{\gamma}) = \arg\min_{\alpha,\, \beta^{*},\, \gamma \,\in\, [0,1]} \sum_{t=1}^{n} \bigl(y_t - \hat{y}_{t \mid t-1}\bigr)^{2}
+$$
 
 **Notation:**
 - `s_t` — seasonal component at time t
@@ -333,9 +413,9 @@ $$
 
 ---
 
-### 6.4 AIC-Based Selection
+### AIC-Based Selection Summary
 
-For each of the 77 areas, all three models (SES, Holt, Holt-Winters) are fitted and the one with the **lowest AIC** is automatically selected.
+For each of the 77 areas, all three models are fitted and the one with the **lowest AIC** is selected:
 
 | Area type | Expected winner |
 |---|---|
@@ -349,8 +429,6 @@ For each of the 77 areas, all three models (SES, Holt, Holt-Winters) are fitted 
 |--------|-------|
 | Validation MAE | *(fill after running)* |
 | Most-selected algorithm | *(fill after running)* |
-
----
 
 ---
 
@@ -373,7 +451,7 @@ Notation: **ARIMA(p, d, q)(P, D, Q)_m**
 
 ### Mathematical Formulation
 
-Using backshift operator B (where B^k · y_t = y_{t-k}), the multiplicative SARIMA model is:
+Using backshift operator B (where B^k · y_t = y_{t-k}):
 
 $$
 \Phi(\text{B}^{m}) \, \phi(\text{B}) \cdot (1 - \text{B}^{m})^{D} (1 - \text{B})^{d} \cdot y_t = c + \Theta(\text{B}^{m}) \, \theta(\text{B}) \, \varepsilon_t
@@ -384,7 +462,21 @@ Where:
 - `Φ(B^m)` and `Θ(B^m)` — seasonal AR and MA polynomials
 - `(1−B)^d` and `(1−B^m)^D` — non-seasonal and seasonal differencing operators
 
-Parameters are estimated by **Maximum Likelihood Estimation (MLE)** via the Kalman Filter in a state-space representation.
+### How SARIMA Parameters Are Estimated (MLE via Kalman Filter)
+
+SARIMA parameters cannot be solved in closed form. Instead, `statsmodels` uses a **state-space representation** and the **Kalman Filter** to recursively compute the one-step-ahead prediction errors (innovations εt), then maximises the Gaussian log-likelihood:
+
+$$
+\ln(L) = -\frac{n'}{2}\ln(2\pi) - \frac{n'}{2}\ln(\sigma^{2}) - \frac{1}{2\sigma^{2}} \sum_{t=1}^{n'} \varepsilon_{t}^{2}
+$$
+
+Where `n'` is the number of observations after differencing. The optimizer (BFGS) adjusts all AR and MA coefficients simultaneously to maximise this likelihood.
+
+**AIC is then computed** for each candidate order and the best is selected:
+
+$$
+\text{AIC} = 2k - 2\ln(L), \quad k = p + q + P + Q + 1
+$$
 
 ### Candidate Grid Searched (by AIC)
 
@@ -416,8 +508,6 @@ The model with the lowest AIC is selected **per area independently**.
 
 ---
 
----
-
 ## Final Results Summary
 
 | # | Method | Validation MAE | Beats target (≤ 10.0) |
@@ -429,8 +519,6 @@ The model with the lowest AIC is selected **per area independently**.
 
 **Best approach:** *(fill after running)*  
 **Submission saved with:** *(fill after running)*
-
----
 
 ---
 
