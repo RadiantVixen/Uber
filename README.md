@@ -339,7 +339,7 @@ $$
 **MLE optimisation for both parameters:**
 
 $$
-(\hat{\alpha}, \hat{\beta}^{*}) = \arg\min_{\alpha, \, \beta^{*} \in [0,1]} \sum_{t=1}^{n} \bigl(y_t - (\ell_{t-1} + b_{t-1})\bigr)^{2}
+(\hat{\alpha}, \hat{\beta}^{\ast}) = \operatorname*{arg\,min}_{\alpha, \, \beta^{\ast} \in [0,1]} \sum_{t=1}^{n} \bigl(y_t - (\ell_{t-1} + b_{t-1})\bigr)^{2}
 $$
 
 **Notation:**
@@ -379,7 +379,7 @@ $$
 $$
 
 $$
-b_{t} = \beta^{*}(\ell_{t} - \ell_{t-1}) + (1 - \beta^{*}) \, b_{t-1}
+b_{t} = \beta^{\ast}(\ell_{t} - \ell_{t-1}) + (1 - \beta^{\ast}) \, b_{t-1}
 $$
 
 $$
@@ -404,7 +404,7 @@ $$
 **MLE optimisation for all three parameters:**
 
 $$
-(\hat{\alpha}, \hat{\beta}^{*}, \hat{\gamma}) = \arg\min_{\alpha,\, \beta^{*},\, \gamma \,\in\, [0,1]} \sum_{t=1}^{n} \bigl(y_t - \hat{y}_{t \mid t-1}\bigr)^{2}
+(\hat{\alpha}, \hat{\beta}^{\ast}, \hat{\gamma}) = \operatorname*{arg\,min}_{\alpha,\, \beta^{\ast},\, \gamma \,\in\, [0,1]} \sum_{t=1}^{n} \bigl(y_t - \hat{y}_{t \mid t-1}\bigr)^{2}
 $$
 
 **Notation:**
